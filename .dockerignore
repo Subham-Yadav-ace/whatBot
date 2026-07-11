@@ -1,0 +1,29 @@
+node_modules/
+.env
+.env.local
+
+# WhatsApp session — mounted as a Docker volume on EC2, never in image
+whatsapp_auth/
+.wwebjs_cache/
+
+# Playwright session — not needed in production
+storageState.json
+
+# Logs and dev artifacts
+*.log
+.DS_Store
+dist/
+
+# Git
+.git/
+.gitignore
+
+# Docker files themselves
+Dockerfile
+.dockerignore
+docker-compose.yml
+docker-compose*.yml
+
+# Docs
+*.md
+plan.md
