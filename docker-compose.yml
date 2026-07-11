@@ -1,15 +1,31 @@
-# MongoDB is on Atlas — only Redis is needed locally for BullMQ
+# Production — EC2 deployment
+# Run: docker compose up -d --build
 
 services:
+
+  bot:
+    build: .
+    container_name: placement-bot
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - NODE_ENV=production
+    volumes:
+      # WhatsApp session persists across restarts and redeployments
+      - wa_auth_data:/app/whatsapp_auth
+    depends_on:
+      - redis
+
   redis:
     image: redis:7-alpine
     container_name: placement-bot-redis
     restart: unless-stopped
-    ports:
-      - '6379:6379'
     volumes:
       - redis_data:/data
     command: redis-server --appendonly yes
 
 volumes:
+  wa_auth_data:
   redis_data:
