@@ -24,6 +24,7 @@ function buildClient() {
         '--no-zygote',
         '--single-process',
         '--disable-gpu',
+        '--disable-crash-reporter',
       ],
     },
   });

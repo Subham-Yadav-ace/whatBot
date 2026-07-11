@@ -1,5 +1,5 @@
 # ── Stage 1: deps ────────────────────────────────────────────
-FROM node:20-slim AS deps
+FROM node:22-slim AS deps
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
 # ── Stage 2: runtime ─────────────────────────────────────────
-FROM node:20-slim AS runtime
+FROM node:22-slim AS runtime
 
 # Install Chromium system libraries required by whatsapp-web.js (Puppeteer)
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -36,6 +36,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 # Tell Puppeteer to use the system Chromium instead of downloading its own
 ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
 ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
+ENV XDG_CONFIG_HOME=/tmp
+ENV XDG_CACHE_HOME=/tmp
 
 WORKDIR /app
 
