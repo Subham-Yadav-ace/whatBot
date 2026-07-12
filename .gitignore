@@ -7,3 +7,6 @@ storageState.json
 dist/
 .wwebjs_cache
 problem.md
+goal.md
+tech.md
+auth.md
