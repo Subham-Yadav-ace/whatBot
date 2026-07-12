@@ -121,6 +121,9 @@ async function runSync() {
 
     if (isNew || (isChanged && prevSummaryWasEmpty && !notice.notifiedNewAt)) {
       // New post OR previously failed extraction now succeeded — send full new-drive message
+      // Mark notifiedNewAt BEFORE enqueuing so a container restart between enqueue
+      // and the worker's own write cannot cause a duplicate notification.
+      await Notice.findByIdAndUpdate(noticeId, { notifiedNewAt: new Date() });
       await notificationQueue.add('new-drive', { noticeId }, {
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
@@ -174,10 +177,11 @@ async function retryEmptySummaries() {
       continue;
     }
 
-    // Save the recovered summary
+    // Save the recovered summary and mark notifiedNewAt atomically BEFORE enqueuing
+    // so a crash between enqueue and the worker's write can't cause a duplicate send.
     const notice = await Notice.findByIdAndUpdate(
       existing._id,
-      { $set: { summary, lastSyncedAt: new Date() } },
+      { $set: { summary, lastSyncedAt: new Date(), notifiedNewAt: new Date() } },
       { returnDocument: 'after' }
     );
 
