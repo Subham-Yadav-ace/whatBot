@@ -56,4 +56,5 @@ USER botuser
 
 EXPOSE 3000
 
-CMD ["node", "src/index.js"]
+# Clean up any leftover Chromium locks on startup before running node
+CMD sh -c 'find /app/whatsapp_auth -name "SingletonLock" -delete 2>/dev/null || true && node src/index.js'
