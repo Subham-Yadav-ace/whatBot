@@ -16,7 +16,8 @@
  *   Reset their notifiedNewAt=null so the fixed bot will send them once.
  */
 
-require('dotenv').config();
+// Load .env if dotenv is available; otherwise expect env vars to be passed directly.
+try { require('dotenv').config(); } catch (_) {}
 const mongoose = require('mongoose');
 const Notice = require('../src/models/Notice');
 
