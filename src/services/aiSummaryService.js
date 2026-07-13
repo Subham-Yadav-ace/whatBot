@@ -13,8 +13,8 @@ const ai = new GoogleGenAI({ apiKey: env.geminiApiKey });
 const SUMMARY_SCHEMA = {
   type: 'object',
   properties: {
-    company: { type: 'string' },
-    role: { type: 'string' },
+    company: { type: 'string', description: 'Name of the company. If multiple companies are listed (e.g., in a schedule), combine their names separated by commas (e.g., "Tarana, Addepar, TCS").' },
+    role: { type: 'string', description: 'The role being offered. If multiple roles across multiple companies are present, combine them (e.g., "Multiple Roles" or "Dev, QA, etc.").' },
     packageOrStipend: { type: 'string', description: 'Human-readable, e.g. "12 LPA" or "₹80,000/month"' },
     packageLPA: {
       type: 'number',
@@ -41,7 +41,7 @@ const SUMMARY_SCHEMA = {
     applyLink: { type: 'string', nullable: true },
     importantInstructions: {
       type: 'string',
-      description: '1-3 sentences summarizing the most important instructions. Empty string if none.',
+      description: '1-3 sentences summarizing the most important instructions. If the notice contains a schedule of multiple companies, use this field to summarize the different dates, venues, or specific criteria for each company. Empty string if none.',
     },
     hasShortlist: {
       type: 'boolean',
@@ -80,6 +80,7 @@ Instructions:
 - Extract ONLY information explicitly stated in the text.
 - NEVER invent values or make assumptions not supported by the text.
 - Use null for numbers not mentioned, null for dates not mentioned, [] for arrays with no values, "" for strings not mentioned.
+- If the notice is a schedule containing multiple companies, COMBINE their names in the "company" field separated by commas, combine their roles in the "role" field, and summarize the different dates and criteria in "importantInstructions".
 - For "deadline": extract the actual application deadline date (NOT a joining date or "within X weeks of joining"). Use ISO 8601 format. If ambiguous or not a clear calendar date, use null.
 - For "packageLPA": extract ONLY the annual CTC in LPA as a number. For pure stipend internships where no LPA is given, use null.
 - For "eligibleBranches": use short branch codes like CSE, IT, ENTC, MECH, CIVIL, etc.

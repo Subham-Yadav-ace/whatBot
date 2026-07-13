@@ -63,6 +63,13 @@ This document summarizes the major technical challenges, bugs, and workflow issu
   1. **Immediate fix:** Deleted stale lock files from the named Docker volume using: `docker run --rm -v whatbot_wa_auth_data:/data alpine sh -c "find /data -name 'Singleton*' -delete"`.
   2. **Permanent fix:** Added `--remote-debugging-port=0` and `--disable-extensions` to the Puppeteer launch arguments in `waClient.js`. The `--remote-debugging-port=0` flag prevents Chromium from registering a singleton port, which is the mechanism that triggers the lock conflict on restart.
 
+### 5.4 Multi-Company Schedule Extraction Bug
+- **Problem:** When the placement portal published a single table containing a schedule for *multiple* companies (e.g., Tarana, Addepar, Opengov, TCS), the bot only sent a WhatsApp notification for the *first* company in the table and completely ignored the rest.
+- **Root Cause:** The `SUMMARY_SCHEMA` used for Gemini AI extraction enforced exactly one `company` and one `role` string per notice. Confronted with a table of multiple companies, the AI simply extracted the first row that matched the schema and discarded the remaining rows to adhere to the strict JSON constraints.
+- **Fix:** Instead of redesigning the entire database schema to support arrays of opportunities, the AI prompt in `aiSummaryService.js` was updated to perform *aggregation*. 
+  - The schema descriptions for `company` and `role` were modified to instruct the AI to combine multiple entities with commas (e.g., `Company: Tarana, Addepar, TCS`).
+  - An explicit instruction was added to `buildPrompt`: "If the notice is a schedule containing multiple companies, COMBINE their names in the 'company' field... and summarize the different dates and criteria in 'importantInstructions'." 
+  - This effectively condenses the entire table into a single, comprehensive WhatsApp message.
 
 
 This is a very common issue! The error happens because the bot was stopped abruptly (like pressing Ctrl+C or restarting the server), leaving behind a hidden Chromium "lock file" inside your WhatsApp session folder. Because this lock file wasn't deleted cleanly, Chromium thinks another instance of the browser is still open and refuses to start.
