@@ -190,7 +190,19 @@ async function retryEmptySummaries() {
     const summary = await extractSummary(existing.title, existing.rawBody);
 
     if (!summary.company && !summary.role) {
-      logger.warn({ postId: existing.portalPostId }, 'Retry still returned empty summary — will try again next cycle');
+      // AI still can't extract company/role — this is an admin/office announcement,
+      // not a placement drive. Queue it as admin-announcement (sent once, no reminders).
+      // Deterministic jobId prevents BullMQ adding duplicate jobs across sync cycles.
+      // Worker's atomic claim ensures it's sent exactly once even if queued multiple times.
+      const noticeId = existing._id.toString();
+      logger.info({ postId: existing.portalPostId, title: existing.title }, 'Empty after retry — queuing as admin-announcement');
+      await notificationQueue.add('admin-announcement', { noticeId }, {
+        attempts: 3,
+        backoff: { type: 'exponential', delay: 5000 },
+        jobId: `admin-${noticeId}`,   // deduplicates in BullMQ queue
+        removeOnComplete: true,
+        removeOnFail: 10,
+      });
       continue;
     }
 
