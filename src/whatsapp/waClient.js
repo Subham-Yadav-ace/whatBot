@@ -25,6 +25,8 @@ function buildClient() {
         '--single-process',
         '--disable-gpu',
         '--disable-crash-reporter',
+        '--disable-extensions',
+        '--remote-debugging-port=0',   // prevents singleton port conflict on restart
       ],
     },
   });
