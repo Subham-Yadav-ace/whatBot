@@ -1,18 +1,19 @@
 'use strict';
 
 /**
- * One-time migration script.
+ * One-time migration script — run ONCE on EC2 before restarting after the fix.
  *
- * The old syncService had a bug: it set notifiedNewAt BEFORE enqueuing the job,
- * which caused the worker to see it already set and skip the actual send.
- * As a result, many notices in the DB have notifiedNewAt=null even though
- * they were processed before the fix.
- *
- * This script marks all such notices as notified so the fixed bot doesn't
- * re-blast old/historical notices on its first run.
- *
- * Run ONCE on EC2 after pulling the fix, before restarting the bot:
  *   node scripts/markOldNoticesNotified.js
+ *
+ * What it does:
+ *
+ * Part A — Placement drives with valid company names that were never sent
+ *   (notifiedNewAt=null). Mark them as notified so the bot doesn't re-blast
+ *   every historical drive on its first run.
+ *
+ * Part B — Admin announcements (empty company) that were incorrectly pre-marked
+ *   as notifiedNewAt by the old buggy syncService but never actually sent.
+ *   Reset their notifiedNewAt=null so the fixed bot will send them once.
  */
 
 require('dotenv').config();
@@ -24,40 +25,60 @@ const MONGO_URI = process.env.MONGO_URI;
 async function main() {
   console.log('Connecting to MongoDB...');
   await mongoose.connect(MONGO_URI);
-  console.log('Connected.');
+  console.log('Connected.\n');
 
-  // Find all notices with a valid company name but no notifiedNewAt timestamp.
-  // These are "stuck" notices that were processed but never sent due to the bug.
-  const stuck = await Notice.find({
+  // ── Part A: Mark stuck placement drives as already notified ──────────────
+  const stuckDrives = await Notice.find({
     notifiedNewAt: null,
     'summary.company': { $ne: '' },
-  }).select('_id title summary.company portalCreatedAt').lean();
+  }).select('_id title summary.company').lean();
 
-  if (stuck.length === 0) {
-    console.log('No stuck notices found. Nothing to do.');
-    await mongoose.disconnect();
-    return;
+  if (stuckDrives.length > 0) {
+    console.log(`Part A — Found ${stuckDrives.length} stuck placement drive(s) to silence:`);
+    stuckDrives.forEach((n) =>
+      console.log(`  - ${n.summary?.company || '?'} | ${n.title}`)
+    );
+    const now = new Date();
+    const r = await Notice.updateMany(
+      { notifiedNewAt: null, 'summary.company': { $ne: '' } },
+      { $set: { notifiedNewAt: now } }
+    );
+    console.log(`  ✅ Marked ${r.modifiedCount} notice(s) as notified (won't be re-sent)\n`);
+  } else {
+    console.log('Part A — No stuck placement drives found.\n');
   }
 
-  console.log(`\nFound ${stuck.length} stuck notice(s) to mark as notified:`);
-  stuck.forEach((n) =>
-    console.log(`  - [${n._id}] ${n['summary.company'] || '?'} | ${n.title}`)
-  );
+  // ── Part B: Unblock admin announcements that were never sent ─────────────
+  // These have notifiedNewAt SET (pre-set by old bug) but company is empty,
+  // meaning the message was never actually delivered. Reset so bot sends them.
+  const blockedAnnouncements = await Notice.find({
+    notifiedNewAt: { $ne: null },
+    'summary.company': '',
+    'summary.role': '',
+    rawBody: { $exists: true, $ne: '' },
+  }).select('_id title').lean();
 
-  const now = new Date();
-  const result = await Notice.updateMany(
-    {
-      notifiedNewAt: null,
-      'summary.company': { $ne: '' },
-    },
-    { $set: { notifiedNewAt: now } }
-  );
-
-  console.log(`\n✅ Marked ${result.modifiedCount} notice(s) as notifiedNewAt=${now.toISOString()}`);
-  console.log('The fixed bot will only send notifications for NEW notices going forward.');
+  if (blockedAnnouncements.length > 0) {
+    console.log(`Part B — Found ${blockedAnnouncements.length} blocked admin announcement(s) to unblock:`);
+    blockedAnnouncements.forEach((n) =>
+      console.log(`  - ${n.title}`)
+    );
+    const r = await Notice.updateMany(
+      {
+        notifiedNewAt: { $ne: null },
+        'summary.company': '',
+        'summary.role': '',
+        rawBody: { $exists: true, $ne: '' },
+      },
+      { $set: { notifiedNewAt: null } }
+    );
+    console.log(`  ✅ Reset ${r.modifiedCount} announcement(s) — bot will send them once on next sync\n`);
+  } else {
+    console.log('Part B — No blocked admin announcements found.\n');
+  }
 
   await mongoose.disconnect();
-  console.log('Done.');
+  console.log('Migration complete. You can now restart the bot.');
 }
 
 main().catch((err) => {

@@ -119,9 +119,21 @@ async function runSync() {
 
     const noticeId = notice._id.toString();
 
-    // Don't send any notification if AI extraction returned empty data.
-    // Students won't get a useless "Company: —" message.
-    if (extractionFailed) continue;
+    if (extractionFailed) {
+      // No company/role found — treat as an admin/office announcement.
+      // Send it once (no reminders). The worker uses an atomic claim so it's sent exactly once
+      // even if the job is retried.
+      if (!notice.notifiedNewAt) {
+        logger.info({ postId, title: post.title }, 'Queuing as admin-announcement (no company extracted)');
+        await notificationQueue.add('admin-announcement', { noticeId }, {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5000 },
+          removeOnComplete: true,
+          removeOnFail: 10,
+        });
+      }
+      continue;
+    }
 
     if (isNew || (isChanged && prevSummaryWasEmpty && !notice.notifiedNewAt)) {
       // New post OR previously failed extraction now succeeded — send full new-drive message.

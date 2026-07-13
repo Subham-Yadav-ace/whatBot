@@ -141,9 +141,50 @@ function formatDailyDigest(newDrives, upcomingDeadlines) {
   return lines.join('\n');
 }
 
+/**
+ * Strip HTML tags from a string and produce readable plain text.
+ */
+function stripHtml(html) {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<\/li>/gi, '\n')
+    .replace(/<li>/gi, '• ')
+    .replace(/<[^>]+>/g, '')       // remove all remaining tags
+    .replace(/&amp;/g, '&')
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/\n{3,}/g, '\n\n')    // collapse excess blank lines
+    .trim();
+}
+
+/**
+ * Admin / office announcement (no company extracted by AI).
+ * Sent once, no reminders.
+ */
+function formatAdminAnnouncement(notice) {
+  const lines = [];
+
+  lines.push('📢 PLACEMENT OFFICE ANNOUNCEMENT');
+  lines.push('');
+  lines.push(`📌 ${notice.title}`);
+  lines.push('');
+
+  if (notice.rawBody) {
+    lines.push(stripHtml(notice.rawBody));
+    lines.push('');
+  }
+
+  lines.push('#Placement #Notice');
+
+  return lines.join('\n');
+}
+
 module.exports = {
   formatNewDrive,
   formatNoticeUpdated,
+  formatAdminAnnouncement,
   formatDeadlineReminder,
   formatFinalReminder,
   formatDailyDigest,

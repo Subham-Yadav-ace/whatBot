@@ -4,7 +4,7 @@ const { Worker } = require('bullmq');
 const { createRedisConnection } = require('../config/redis');
 const Notice = require('../models/Notice');
 const { sendToGroup } = require('../whatsapp/waClient');
-const { formatNewDrive, formatNoticeUpdated } = require('../whatsapp/templates');
+const { formatNewDrive, formatNoticeUpdated, formatAdminAnnouncement } = require('../whatsapp/templates');
 const env = require('../config/env');
 const logger = require('../utils/logger').child({ module: 'notificationWorker' });
 
@@ -46,6 +46,22 @@ async function startNotificationWorker() {
         await sendToGroup(formatNoticeUpdated(notice, diffLines || []));
         await Notice.findByIdAndUpdate(noticeId, { notifiedUpdateAt: new Date() }, { returnDocument: 'after' });
         logger.info({ noticeId, company: notice.summary.company }, 'Notice-updated notification sent');
+        return;
+      }
+
+      if (job.name === 'admin-announcement') {
+        // Atomic claim — send exactly once, no reminders.
+        const claimed = await Notice.findOneAndUpdate(
+          { _id: noticeId, notifiedNewAt: null },
+          { $set: { notifiedNewAt: new Date() } },
+          { returnDocument: 'after' }
+        );
+        if (!claimed) {
+          logger.info({ noticeId }, 'Already notified for admin-announcement — skipping duplicate');
+          return;
+        }
+        await sendToGroup(formatAdminAnnouncement(notice));
+        logger.info({ noticeId, title: notice.title }, 'Admin announcement sent');
       }
     },
     {
