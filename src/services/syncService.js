@@ -75,12 +75,33 @@ async function runSync() {
 
     logger.info({ postId, title: post.title, isNew, isChanged }, 'Processing post');
 
-    const [detail, attachments] = await Promise.all([
+    const [detail, rawAttachments] = await Promise.all([
       fetchPostDetail(jwt, postId),
       fetchAttachments(jwt, postId),
     ]);
 
-    const summary = await extractSummary(post.title, detail.body || detail.title || '');
+    const newRawBody = detail.body || detail.title || '';
+    const newAttachments = rawAttachments.map((a) => ({ fileName: a.fileName, url: a.url }));
+
+    // If the portal updated the timestamp but the content is actually identical, 
+    // skip the LLM extraction to avoid false-positive updates due to AI non-determinism.
+    if (isChanged && existing) {
+      const sameTitle = existing.title === post.title;
+      const sameBody = (existing.rawBody || '') === newRawBody;
+      const sameAttachments = JSON.stringify(existing.attachments || []) === JSON.stringify(newAttachments);
+
+      if (sameTitle && sameBody && sameAttachments) {
+        logger.info({ postId, title: post.title }, 'Portal updatedAt changed, but raw content is identical. Skipping LLM diff.');
+        await Notice.updateOne(
+          { portalPostId: postId },
+          { $set: { portalUpdatedAt: postUpdatedAt, lastSyncedAt: new Date() } }
+        );
+        continue;
+      }
+    }
+
+    const attachments = newAttachments; // for the rest of the code
+    const summary = await extractSummary(post.title, newRawBody);
 
     // If AI extraction failed (rate limit exhausted after retries), skip notification.
     // The notice is still saved so the portal updatedAt is tracked.
@@ -105,8 +126,8 @@ async function runSync() {
         $set: {
           portalPostId: postId,
           title: post.title,
-          rawBody: detail.body || '',
-          attachments: attachments.map((a) => ({ fileName: a.fileName, url: a.url })),
+          rawBody: newRawBody,
+          attachments: attachments,
           summary,
           previousSummary: isChanged ? existing.summary : undefined,
           portalCreatedAt: post.createdAt || '',
