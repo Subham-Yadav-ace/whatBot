@@ -62,3 +62,13 @@ This document summarizes the major technical challenges, bugs, and workflow issu
 - **Fix:**
   1. **Immediate fix:** Deleted stale lock files from the named Docker volume using: `docker run --rm -v whatbot_wa_auth_data:/data alpine sh -c "find /data -name 'Singleton*' -delete"`.
   2. **Permanent fix:** Added `--remote-debugging-port=0` and `--disable-extensions` to the Puppeteer launch arguments in `waClient.js`. The `--remote-debugging-port=0` flag prevents Chromium from registering a singleton port, which is the mechanism that triggers the lock conflict on restart.
+
+
+
+This is a very common issue! The error happens because the bot was stopped abruptly (like pressing Ctrl+C or restarting the server), leaving behind a hidden Chromium "lock file" inside your WhatsApp session folder. Because this lock file wasn't deleted cleanly, Chromium thinks another instance of the browser is still open and refuses to start.
+
+The Permanent Fix
+I have just updated your Dockerfile to automatically search for and delete this SingletonLock file every single time the container starts up. This completely prevents this issue from ever happening again, even if the bot crashes or the EC2 server reboots!
+
+How to apply it
+Since I made the change to your code, you just need to run through your standard deployment workflow again to get the server back online with both of our recent fixes:
