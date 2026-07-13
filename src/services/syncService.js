@@ -62,18 +62,22 @@ async function runSync() {
   let updatedCount = 0;
 
   for (const post of posts) {
-    const existing = await Notice.findOne({ portalPostId: post.id }).lean();
+    // Coerce to string to prevent type-mismatch if the portal returns numeric IDs.
+    const postId = String(post.id);
+    const postUpdatedAt = String(post.updatedAt || '');
+
+    const existing = await Notice.findOne({ portalPostId: postId }).lean();
 
     const isNew     = !existing;
-    const isChanged = existing && existing.portalUpdatedAt !== post.updatedAt;
+    const isChanged = existing && existing.portalUpdatedAt !== postUpdatedAt;
 
     if (!isNew && !isChanged) continue;
 
-    logger.info({ postId: post.id, title: post.title, isNew, isChanged }, 'Processing post');
+    logger.info({ postId, title: post.title, isNew, isChanged }, 'Processing post');
 
     const [detail, attachments] = await Promise.all([
-      fetchPostDetail(jwt, post.id),
-      fetchAttachments(jwt, post.id),
+      fetchPostDetail(jwt, postId),
+      fetchAttachments(jwt, postId),
     ]);
 
     const summary = await extractSummary(post.title, detail.body || detail.title || '');
@@ -83,7 +87,7 @@ async function runSync() {
     // It will be re-processed properly when the portal next updates the post.
     const extractionFailed = !summary.company && !summary.role;
     if (extractionFailed) {
-      logger.warn({ postId: post.id, title: post.title }, 'AI extraction returned empty — saving to DB but skipping notification');
+      logger.warn({ postId, title: post.title }, 'AI extraction returned empty — saving to DB but skipping notification');
     }
 
     // Diff against stored summary.
@@ -96,17 +100,17 @@ async function runSync() {
     }
 
     const notice = await Notice.findOneAndUpdate(
-      { portalPostId: post.id },
+      { portalPostId: postId },
       {
         $set: {
-          portalPostId: post.id,
+          portalPostId: postId,
           title: post.title,
           rawBody: detail.body || '',
           attachments: attachments.map((a) => ({ fileName: a.fileName, url: a.url })),
           summary,
           previousSummary: isChanged ? existing.summary : undefined,
           portalCreatedAt: post.createdAt || '',
-          portalUpdatedAt: post.updatedAt  || '',
+          portalUpdatedAt: postUpdatedAt,
           lastSyncedAt: new Date(),
         },
       },
@@ -120,10 +124,11 @@ async function runSync() {
     if (extractionFailed) continue;
 
     if (isNew || (isChanged && prevSummaryWasEmpty && !notice.notifiedNewAt)) {
-      // New post OR previously failed extraction now succeeded — send full new-drive message
-      // Mark notifiedNewAt BEFORE enqueuing so a container restart between enqueue
-      // and the worker's own write cannot cause a duplicate notification.
-      await Notice.findByIdAndUpdate(noticeId, { notifiedNewAt: new Date() });
+      // New post OR previously failed extraction now succeeded — send full new-drive message.
+      // NOTE: Do NOT set notifiedNewAt here. The worker atomically claims the send
+      // using findOneAndUpdate({ notifiedNewAt: null }) so it acts as both the guard
+      // and the marker. This avoids the race where a pre-emptive write causes the
+      // worker to see notifiedNewAt already set and skip the actual send.
       await notificationQueue.add('new-drive', { noticeId }, {
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
@@ -177,15 +182,15 @@ async function retryEmptySummaries() {
       continue;
     }
 
-    // Save the recovered summary and mark notifiedNewAt atomically BEFORE enqueuing
-    // so a crash between enqueue and the worker's write can't cause a duplicate send.
+    // Save the recovered summary (do NOT set notifiedNewAt here — the worker
+    // atomically claims the send to avoid pre-emptive writes blocking the notification).
     const notice = await Notice.findByIdAndUpdate(
       existing._id,
-      { $set: { summary, lastSyncedAt: new Date(), notifiedNewAt: new Date() } },
+      { $set: { summary, lastSyncedAt: new Date() } },
       { returnDocument: 'after' }
     );
 
-    // Now enqueue the new-drive notification
+    // Enqueue the new-drive notification; worker will set notifiedNewAt atomically.
     await notificationQueue.add('new-drive', { noticeId: notice._id.toString() }, {
       attempts: 3,
       backoff: { type: 'exponential', delay: 5000 },
