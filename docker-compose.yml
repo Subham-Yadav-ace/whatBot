@@ -12,6 +12,7 @@ services:
       - REDIS_HOST=redis
       - REDIS_PORT=6379
       - NODE_ENV=production
+      - TZ=Asia/Kolkata
     volumes:
       # WhatsApp session persists across restarts and redeployments
       - wa_auth_data:/app/whatsapp_auth

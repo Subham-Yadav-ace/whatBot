@@ -176,7 +176,12 @@ async function runSync() {
       await scheduleReminders(notice);
       newCount++;
     } else if (isChanged && diff.hasChanges) {
+      // Deterministic jobId: ties this job to the exact change event (lastSyncedAt).
+      // If the sync cycle detects the same change again before this job is processed,
+      // BullMQ sees the same jobId and discards the duplicate enqueue.
+      const updateJobId = `update-${noticeId}-${notice.lastSyncedAt.getTime()}`;
       await notificationQueue.add('notice-updated', { noticeId, diffLines: diff.lines }, {
+        jobId: updateJobId,
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
         removeOnComplete: true,

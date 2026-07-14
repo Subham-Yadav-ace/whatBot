@@ -43,16 +43,29 @@ async function startNotificationWorker() {
       }
 
       if (job.name === 'notice-updated') {
-        // Atomic claim — same pattern as new-drive to prevent duplicate sends on BullMQ retry.
-        // The DB write happens BEFORE the WhatsApp send so a crash between the two
-        // doesn't cause the message to fire again on the next attempt.
+        // Atomic guard — prevents duplicate sends on BullMQ retry while still allowing
+        // future genuine updates to the same notice.
+        //
+        // We use notice.lastSyncedAt as the change-event identifier:
+        //   • notifiedUpdateAt: null  → never notified for an update yet → send
+        //   • notifiedUpdateAt < lastSyncedAt → already notified, but syncService detected
+        //     a NEW content change since then → send again (legitimate 2nd update)
+        //   • notifiedUpdateAt >= lastSyncedAt → already notified for this exact change → skip
+        //
+        // DB is written BEFORE sendToGroup so any crash/retry between the two is safe.
         const claimed = await Notice.findOneAndUpdate(
-          { _id: noticeId, notifiedUpdateAt: null },
+          {
+            _id: noticeId,
+            $or: [
+              { notifiedUpdateAt: null },
+              { notifiedUpdateAt: { $lt: notice.lastSyncedAt } },
+            ],
+          },
           { $set: { notifiedUpdateAt: new Date() } },
           { returnDocument: 'after' }
         );
         if (!claimed) {
-          logger.info({ noticeId }, 'Already notified for notice-updated — skipping duplicate');
+          logger.info({ noticeId }, 'Already notified for this update event — skipping duplicate');
           return;
         }
         await sendToGroup(formatNoticeUpdated(notice, diffLines || []));
