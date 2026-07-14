@@ -84,3 +84,7 @@ Since I made the change to your code, you just need to run through your standard
 
 
 as the gemini sever went down the bot waited till the next cycle
+
+when a timestamps of post changed , re called 
+so to hash the content is the best and to check
+with the help of that

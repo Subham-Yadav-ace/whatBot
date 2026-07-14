@@ -1,5 +1,6 @@
 'use strict';
 
+const crypto = require('crypto');
 const dayjs = require('dayjs');
 const logger = require('../utils/logger').child({ module: 'syncService' });
 const { downloadStorageState, extractSessionCookie } = require('../portal/sessionManager');
@@ -68,10 +69,14 @@ async function runSync() {
 
     const existing = await Notice.findOne({ portalPostId: postId }).lean();
 
-    const isNew     = !existing;
-    const isChanged = existing && existing.portalUpdatedAt !== postUpdatedAt;
+    const isNew = !existing;
+    // First-pass gate: use the portal's updatedAt string to skip posts that haven't
+    // even ticked their relative timestamp. This avoids fetchPostDetail for the majority
+    // of posts on every cycle. The definitive isChanged check comes AFTER fetching,
+    // using a content hash that's immune to relative string drift.
+    const portalTimestampChanged = existing && existing.portalUpdatedAt !== postUpdatedAt;
 
-    if (!isNew && !isChanged) continue;
+    if (!isNew && !portalTimestampChanged) continue;
 
     logger.info({ postId, title: post.title, isNew, isChanged }, 'Processing post');
 
@@ -83,21 +88,25 @@ async function runSync() {
     const newRawBody = detail.body || detail.title || '';
     const newAttachments = rawAttachments.map((a) => ({ fileName: a.fileName, url: a.url }));
 
-    // If the portal updated the timestamp but the content is actually identical, 
-    // skip the LLM extraction to avoid false-positive updates due to AI non-determinism.
-    if (isChanged && existing) {
-      const sameTitle = existing.title === post.title;
-      const sameBody = (existing.rawBody || '') === newRawBody;
-      const sameAttachments = JSON.stringify(existing.attachments || []) === JSON.stringify(newAttachments);
+    // Compute content hash — the definitive source of truth for change detection.
+    // Compares title + body + attachments so that a portal relative-timestamp tick
+    // ("1 day ago" → "2 days ago") is NOT treated as a content change.
+    const newContentHash = crypto
+      .createHash('md5')
+      .update(post.title + newRawBody + JSON.stringify(newAttachments))
+      .digest('hex');
 
-      if (sameTitle && sameBody && sameAttachments) {
-        logger.info({ postId, title: post.title }, 'Portal updatedAt changed, but raw content is identical. Skipping LLM diff.');
-        await Notice.updateOne(
-          { portalPostId: postId },
-          { $set: { portalUpdatedAt: postUpdatedAt, lastSyncedAt: new Date() } }
-        );
-        continue;
-      }
+    const isChanged = existing && existing.contentHash !== newContentHash;
+
+    if (!isNew && !isChanged) {
+      // portalUpdatedAt string drifted but content is identical — just update the
+      // stored timestamp so the next cycle's first-pass gate matches again.
+      logger.info({ postId, title: post.title }, 'Portal timestamp drifted but content hash unchanged — skipping LLM diff.');
+      await Notice.updateOne(
+        { portalPostId: postId },
+        { $set: { portalUpdatedAt: postUpdatedAt, lastSyncedAt: new Date() } }
+      );
+      continue;
     }
 
     const attachments = newAttachments; // for the rest of the code
@@ -128,6 +137,7 @@ async function runSync() {
           title: post.title,
           rawBody: newRawBody,
           attachments: attachments,
+          contentHash: newContentHash,
           summary,
           previousSummary: isChanged ? existing.summary : undefined,
           portalCreatedAt: post.createdAt || '',

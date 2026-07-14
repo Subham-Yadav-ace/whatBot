@@ -57,6 +57,11 @@ const noticeSchema = new mongoose.Schema(
     portalUpdatedAt: { type: String, default: '' },
     lastSyncedAt: { type: Date, default: null },
 
+    // MD5 hash of (title + rawBody + attachments JSON).
+    // Used for change detection — immune to portal's relative timestamp strings
+    // like "1 day ago" → "2 days ago" that change without any real content update.
+    contentHash: { type: String, default: null },
+
     // Notification guard timestamps — prevent duplicate sends
     notifiedNewAt: { type: Date, default: null },
     notifiedUpdateAt: { type: Date, default: null },
