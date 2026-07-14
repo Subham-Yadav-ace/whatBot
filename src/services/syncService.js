@@ -78,7 +78,7 @@ async function runSync() {
 
     if (!isNew && !portalTimestampChanged) continue;
 
-    logger.info({ postId, title: post.title, isNew, isChanged }, 'Processing post');
+    logger.info({ postId, title: post.title, isNew, portalTimestampChanged }, 'Processing post');
 
     const [detail, rawAttachments] = await Promise.all([
       fetchPostDetail(jwt, postId),
