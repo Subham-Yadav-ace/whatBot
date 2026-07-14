@@ -72,19 +72,38 @@ This document summarizes the major technical challenges, bugs, and workflow issu
   - This effectively condenses the entire table into a single, comprehensive WhatsApp message.
 
 
-This is a very common issue! The error happens because the bot was stopped abruptly (like pressing Ctrl+C or restarting the server), leaving behind a hidden Chromium "lock file" inside your WhatsApp session folder. Because this lock file wasn't deleted cleanly, Chromium thinks another instance of the browser is still open and refuses to start.
+## 6. Notification & Sync Bugs (Jul 14, 2026)
 
-The Permanent Fix
-I have just updated your Dockerfile to automatically search for and delete this SingletonLock file every single time the container starts up. This completely prevents this issue from ever happening again, even if the bot crashes or the EC2 server reboots!
+### 6.1 `notice-updated` Duplicate Sends on BullMQ Retry
+- **Problem:** When a portal notice was genuinely updated (e.g., Opengov eligible batches changed), the "PLACEMENT NOTICE UPDATED" WhatsApp message was sent **multiple times** — seen as two identical messages 10 minutes apart in the group.
+- **Root Cause:** Two compounding bugs:
+  1. **Worker layer:** The old `notice-updated` job wrote `notifiedUpdateAt` to MongoDB **after** calling `sendToGroup`. If anything failed between the send and the DB write (network blip, container restart), BullMQ retried the job and found `notifiedUpdateAt = null` — so it sent the message again.
+  2. **Sync layer:** The sync service had **no guard on `notifiedUpdateAt`** before queuing a new `notice-updated` job. If the portal's relative timestamp string changed between sync cycles (`"23 hours ago"` → `"1 day ago"`), `isChanged = true` was triggered again, a new job was queued, and the message fired a second time.
+- **Fix:**
+  1. The worker now performs an **atomic MongoDB claim before sending**: `findOneAndUpdate({ notifiedUpdateAt: null OR notifiedUpdateAt < lastSyncedAt })`. The DB is written first; the send happens after. Retries for the same event are blocked; future genuine updates are allowed (because a new content change produces a newer `lastSyncedAt`).
+  2. A **deterministic `jobId`** (`update-<noticeId>-<lastSyncedAt.getTime()>`) is added in `syncService` when queuing `notice-updated`. BullMQ drops duplicate enqueues for the same change event while the job is still in the queue.
 
-How to apply it
-Since I made the change to your code, you just need to run through your standard deployment workflow again to get the server back online with both of our recent fixes:
+### 6.2 Wasted Gemini API Calls Every Sync Cycle for Admin Notices
+- **Problem:** The Gemini API was being called repeatedly (every 5 minutes) for office/admin notices (e.g., "Placement Verification", "Report to Address") that have no company or role, even though the website had not changed at all.
+- **Root Cause:** `retryEmptySummaries()` runs at the end of every sync cycle and queries for all notices with `summary.company = ''` and `notifiedNewAt = null`. Admin notices (which will never have a company extracted) match this query indefinitely. There was nothing to stop Gemini from being called on them again and again while their BullMQ `admin-announcement` job was still waiting to be processed by the worker.
+- **Fix:**
+  1. Added a `pendingAdminAt` timestamp field to the `Notice` schema.
+  2. When an `admin-announcement` job is queued (in both the main sync loop and `retryEmptySummaries`), `pendingAdminAt` is written to the DB **before** adding the job to BullMQ.
+  3. `retryEmptySummaries` now filters `pendingAdminAt: null` — so any notice already queued as admin is completely skipped, eliminating the unnecessary Gemini call every cycle.
+  4. A deterministic `jobId: admin-<noticeId>` was also added to the main sync loop (it was already present in `retryEmptySummaries` but missing in the main loop), ensuring BullMQ deduplicates any race between the two code paths.
 
+### 6.3 Portal Relative Timestamp Drift Causing Unnecessary API Calls
+- **Problem:** The college placement portal returns `updatedAt` as a **relative string** (e.g., `"1 day ago"`, `"35 minutes ago"`) instead of an absolute timestamp. These strings change every sync cycle — e.g., `"1 day ago"` becomes `"2 days ago"` — triggering `isChanged = true` and causing the bot to make two unnecessary portal API calls (`fetchPostDetail` + `fetchAttachments`) for every existing post on the day the string ticked over. At scale (30–50 posts), this would be 60–100 extra API calls in a single sync cycle.
+- **Root Cause:** Change detection relied solely on `existing.portalUpdatedAt !== postUpdatedAt` — a string comparison of an inherently unstable relative value.
+- **Fix:** Implemented a **two-phase content hash change detection** system:
+  1. **Phase 1 (zero API calls):** The `portalUpdatedAt` string is still used as a fast first-pass gate. If the string hasn't changed, skip the post entirely.
+  2. **Phase 2 (after fetching detail):** An MD5 hash of `title + rawBody + attachments` is computed and compared against `contentHash` stored in the DB. This is the **definitive change check** — immune to relative string drift.
+  - A new `contentHash` field was added to the `Notice` schema and is saved on every write.
+  - If the portal timestamp drifted but the content hash is identical → update `portalUpdatedAt` in DB and continue. No Gemini, no BullMQ job, no WhatsApp message.
+  - If the hash differs → genuine content change → proceed with Gemini extraction and notification.
+  - The old verbose 13-line content-identity check (comparing full body strings) was removed and replaced by the clean hash comparison.
 
-
-
-as the gemini sever went down the bot waited till the next cycle
-
-when a timestamps of post changed , re called 
-so to hash the content is the best and to check
-with the help of that
+### 6.4 Daily Digest and Deadline Reminders Firing at Wrong Time (UTC vs IST)
+- **Problem:** The daily digest was being sent at **2:30 AM IST** instead of 9:00 AM. Deadline reminders were also firing in the early morning hours.
+- **Root Cause:** The AWS EC2 server runs in UTC by default. The daily digest cron `0 9 * * *` means 9:00 AM UTC = **2:30 AM IST**. Similarly, `dayjs().endOf('day')` in the reminder scheduler resolved to midnight UTC = 5:30 AM IST, causing the final reminder to fire at ~3:30 AM IST.
+- **Fix:** Added `TZ=Asia/Kolkata` to the bot service environment block in `docker-compose.yml`. This sets the Node.js process timezone to IST inside the container, making all `dayjs()` calls, cron expressions, and `Date` operations run in Indian Standard Time with no code changes required.
