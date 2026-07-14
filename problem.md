@@ -79,3 +79,8 @@ I have just updated your Dockerfile to automatically search for and delete this 
 
 How to apply it
 Since I made the change to your code, you just need to run through your standard deployment workflow again to get the server back online with both of our recent fixes:
+
+
+
+
+as the gemini sever went down the bot waited till the next cycle

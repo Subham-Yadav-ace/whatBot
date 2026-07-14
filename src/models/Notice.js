@@ -60,6 +60,11 @@ const noticeSchema = new mongoose.Schema(
     // Notification guard timestamps — prevent duplicate sends
     notifiedNewAt: { type: Date, default: null },
     notifiedUpdateAt: { type: Date, default: null },
+
+    // Set when a notice is queued as an admin-announcement job.
+    // Prevents retryEmptySummaries from calling Gemini again every cycle
+    // during the window between "job queued" and "worker processes it".
+    pendingAdminAt: { type: Date, default: null },
   },
   {
     timestamps: true, // adds Mongoose createdAt / updatedAt

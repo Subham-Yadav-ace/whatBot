@@ -43,8 +43,19 @@ async function startNotificationWorker() {
       }
 
       if (job.name === 'notice-updated') {
+        // Atomic claim — same pattern as new-drive to prevent duplicate sends on BullMQ retry.
+        // The DB write happens BEFORE the WhatsApp send so a crash between the two
+        // doesn't cause the message to fire again on the next attempt.
+        const claimed = await Notice.findOneAndUpdate(
+          { _id: noticeId, notifiedUpdateAt: null },
+          { $set: { notifiedUpdateAt: new Date() } },
+          { returnDocument: 'after' }
+        );
+        if (!claimed) {
+          logger.info({ noticeId }, 'Already notified for notice-updated — skipping duplicate');
+          return;
+        }
         await sendToGroup(formatNoticeUpdated(notice, diffLines || []));
-        await Notice.findByIdAndUpdate(noticeId, { notifiedUpdateAt: new Date() }, { returnDocument: 'after' });
         logger.info({ noticeId, company: notice.summary.company }, 'Notice-updated notification sent');
         return;
       }

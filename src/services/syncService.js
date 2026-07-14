@@ -144,11 +144,16 @@ async function runSync() {
       // No company/role found — treat as an admin/office announcement.
       // Send it once (no reminders). The worker uses an atomic claim so it's sent exactly once
       // even if the job is retried.
-      if (!notice.notifiedNewAt) {
+      // Guard: skip if already sent OR already queued (pendingAdminAt prevents re-queuing
+      // in subsequent sync cycles while the job is still waiting in the BullMQ queue).
+      if (!notice.notifiedNewAt && !notice.pendingAdminAt) {
         logger.info({ postId, title: post.title }, 'Queuing as admin-announcement (no company extracted)');
+        // Set pendingAdminAt BEFORE queuing so the next sync cycle skips this notice.
+        await Notice.findByIdAndUpdate(noticeId, { $set: { pendingAdminAt: new Date() } });
         await notificationQueue.add('admin-announcement', { noticeId }, {
           attempts: 3,
           backoff: { type: 'exponential', delay: 5000 },
+          jobId: `admin-${noticeId}`,  // deterministic — BullMQ deduplicates while job is live
           removeOnComplete: true,
           removeOnFail: 10,
         });
@@ -199,6 +204,7 @@ async function retryEmptySummaries() {
     'summary.company': '',
     'summary.role': '',
     notifiedNewAt: null,
+    pendingAdminAt: null,  // skip notices already queued as admin-announcement
     rawBody: { $exists: true, $ne: '' },
   }).lean();
 
@@ -213,10 +219,12 @@ async function retryEmptySummaries() {
     if (!summary.company && !summary.role) {
       // AI still can't extract company/role — this is an admin/office announcement,
       // not a placement drive. Queue it as admin-announcement (sent once, no reminders).
-      // Deterministic jobId prevents BullMQ adding duplicate jobs across sync cycles.
-      // Worker's atomic claim ensures it's sent exactly once even if queued multiple times.
+      // Set pendingAdminAt so future retryEmptySummaries cycles skip this notice
+      // entirely (no Gemini call) until the worker processes it and sets notifiedNewAt.
       const noticeId = existing._id.toString();
       logger.info({ postId: existing.portalPostId, title: existing.title }, 'Empty after retry — queuing as admin-announcement');
+      // Set pendingAdminAt BEFORE queuing to protect against the next sync cycle.
+      await Notice.findByIdAndUpdate(existing._id, { $set: { pendingAdminAt: new Date() } });
       await notificationQueue.add('admin-announcement', { noticeId }, {
         attempts: 3,
         backoff: { type: 'exponential', delay: 5000 },
