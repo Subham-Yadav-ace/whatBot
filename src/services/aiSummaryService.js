@@ -48,6 +48,10 @@ const SUMMARY_SCHEMA = {
       description: 'Set to true if the body contains a specific list or table of student names who are shortlisted, eligible, or selected. False otherwise.',
     },
     isInternship: { type: 'boolean' },
+    isFollowUp: {
+      type: 'boolean',
+      description: 'Set to true if this post is a follow-up or update for an existing drive — e.g. shortlist announcement, interview schedule, slot timings, reporting instructions, or additional details for a company already announced. Set to false if this is a brand-new placement or internship drive announcement.',
+    },
   },
   required: [
     'company',
@@ -62,6 +66,7 @@ const SUMMARY_SCHEMA = {
     'applyLink',
     'importantInstructions',
     'isInternship',
+    'isFollowUp',
   ],
 };
 
@@ -85,6 +90,7 @@ Instructions:
 - For "packageLPA": extract ONLY the annual CTC in LPA as a number. For pure stipend internships where no LPA is given, use null.
 - For "eligibleBranches": use short branch codes like CSE, IT, ENTC, MECH, CIVIL, etc.
 - For "isInternship": true if the role is an internship or internship+PPO, false otherwise.
+- For "isFollowUp": set to true if this post is a follow-up/update for a company already announced — e.g. shortlist announcement, interview slot timings, PPT/GD/PI schedule, reporting instructions, or any supplementary details. Set to false if this is a brand-new drive announcement.
 - Respond with ONLY the JSON object. No markdown, no explanation, no code fences.`;
 }
 
@@ -185,6 +191,7 @@ function getEmptySummary() {
     applyLink: null,
     importantInstructions: '',
     isInternship: false,
+    isFollowUp: false,
   };
 }
 

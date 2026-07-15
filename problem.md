@@ -112,3 +112,8 @@ This document summarizes the major technical challenges, bugs, and workflow issu
 existing.contentHash === null  →  baseline guard fires → save hash, skip ✅
 existing.contentHash === newHash  →  drift-only path → update timestamps, skip ✅  
 existing.contentHash !== newHash  →  genuine change → run AI diff + notify ✅
+
+
+
+the msg of update of a company are being sent as a new drive 
+-->to be fixed

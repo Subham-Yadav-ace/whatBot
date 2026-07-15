@@ -16,6 +16,7 @@ const summaryShape = {
   importantInstructions: { type: String, default: '' },
   hasShortlist: { type: Boolean, default: false },
   isInternship: { type: Boolean, default: false },
+  isFollowUp: { type: Boolean, default: false },
 };
 
 const noticeSchema = new mongoose.Schema(

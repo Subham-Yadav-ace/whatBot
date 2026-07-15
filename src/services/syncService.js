@@ -186,19 +186,33 @@ async function runSync() {
     }
 
     if (isNew || (isChanged && prevSummaryWasEmpty && !notice.notifiedNewAt)) {
-      // New post OR previously failed extraction now succeeded — send full new-drive message.
-      // NOTE: Do NOT set notifiedNewAt here. The worker atomically claims the send
-      // using findOneAndUpdate({ notifiedNewAt: null }) so it acts as both the guard
-      // and the marker. This avoids the race where a pre-emptive write causes the
-      // worker to see notifiedNewAt already set and skip the actual send.
-      await notificationQueue.add('new-drive', { noticeId }, {
-        attempts: 3,
-        backoff: { type: 'exponential', delay: 5000 },
-        removeOnComplete: true,
-        removeOnFail: 10,
-      });
-      await scheduleReminders(notice);
-      newCount++;
+      if (summary.isFollowUp) {
+        // New post but it's a follow-up to an existing drive (e.g. shortlist, interview
+        // schedule). Use the PLACEMENT UPDATE template instead of NEW PLACEMENT DRIVE.
+        // No deadline reminders needed — these posts don't have apply deadlines.
+        await notificationQueue.add('follow-up-post', { noticeId }, {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5000 },
+          removeOnComplete: true,
+          removeOnFail: 10,
+        });
+        logger.info({ noticeId, company: summary.company }, 'Queued as follow-up-post');
+        newCount++;
+      } else {
+        // Genuine new placement/internship drive.
+        // NOTE: Do NOT set notifiedNewAt here. The worker atomically claims the send
+        // using findOneAndUpdate({ notifiedNewAt: null }) so it acts as both the guard
+        // and the marker. This avoids the race where a pre-emptive write causes the
+        // worker to see notifiedNewAt already set and skip the actual send.
+        await notificationQueue.add('new-drive', { noticeId }, {
+          attempts: 3,
+          backoff: { type: 'exponential', delay: 5000 },
+          removeOnComplete: true,
+          removeOnFail: 10,
+        });
+        await scheduleReminders(notice);
+        newCount++;
+      }
     } else if (isChanged && diff.hasChanges) {
       // Deterministic jobId: ties this job to the exact change event (lastSyncedAt).
       // If the sync cycle detects the same change again before this job is processed,

@@ -69,6 +69,33 @@ function formatNoticeUpdated(notice, diffLines) {
 }
 
 /**
+ * A new portal post that is a follow-up to an existing drive
+ * (e.g. shortlist, interview schedule, additional instructions).
+ */
+function formatFollowUpPost(notice) {
+  const s = notice.summary;
+  const lines = [];
+
+  lines.push('📋 PLACEMENT UPDATE');
+  lines.push('');
+  lines.push(`🏢 Company: ${s.company || '—'}`);
+  if (s.role) lines.push(`💼 Role: ${s.role}`);
+  lines.push('');
+  if (s.importantInstructions) {
+    lines.push(`📝 ${s.importantInstructions}`);
+    lines.push('');
+  }
+  if (notice.attachments?.length) {
+    lines.push(`📎 Attachments: ${notice.attachments.map((a) => a.fileName).join(', ')}`);
+    lines.push('');
+  }
+  const tag = (s.company || 'Placement').replace(/\s+/g, '');
+  lines.push(`#Placement #${tag}`);
+
+  return lines.join('\n');
+}
+
+/**
  * 24-hour deadline reminder.
  */
 function formatDeadlineReminder(notice) {
@@ -184,6 +211,7 @@ function formatAdminAnnouncement(notice) {
 module.exports = {
   formatNewDrive,
   formatNoticeUpdated,
+  formatFollowUpPost,
   formatAdminAnnouncement,
   formatDeadlineReminder,
   formatFinalReminder,

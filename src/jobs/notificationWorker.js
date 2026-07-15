@@ -4,7 +4,7 @@ const { Worker } = require('bullmq');
 const { createRedisConnection } = require('../config/redis');
 const Notice = require('../models/Notice');
 const { sendToGroup } = require('../whatsapp/waClient');
-const { formatNewDrive, formatNoticeUpdated, formatAdminAnnouncement } = require('../whatsapp/templates');
+const { formatNewDrive, formatNoticeUpdated, formatFollowUpPost, formatAdminAnnouncement } = require('../whatsapp/templates');
 const env = require('../config/env');
 const logger = require('../utils/logger').child({ module: 'notificationWorker' });
 
@@ -39,6 +39,22 @@ async function startNotificationWorker() {
         }
         await sendToGroup(formatNewDrive(notice));
         logger.info({ noticeId, company: notice.summary.company }, 'New-drive notification sent');
+        return;
+      }
+
+      if (job.name === 'follow-up-post') {
+        // Atomic claim — same guard as new-drive; notifiedNewAt doubles as the send marker.
+        const claimed = await Notice.findOneAndUpdate(
+          { _id: noticeId, notifiedNewAt: null },
+          { $set: { notifiedNewAt: new Date() } },
+          { returnDocument: 'after' }
+        );
+        if (!claimed) {
+          logger.info({ noticeId }, 'Already notified for follow-up-post — skipping duplicate');
+          return;
+        }
+        await sendToGroup(formatFollowUpPost(notice));
+        logger.info({ noticeId, company: notice.summary.company }, 'Follow-up post notification sent');
         return;
       }
 
