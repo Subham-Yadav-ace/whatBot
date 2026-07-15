@@ -96,6 +96,20 @@ async function runSync() {
       .update(post.title + newRawBody + JSON.stringify(newAttachments))
       .digest('hex');
 
+    // Baseline guard: existing record has no contentHash yet (saved before the
+    // hash feature was deployed). null !== newHash is truthy, which would
+    // incorrectly set isChanged = true and enqueue a notice-updated job for a
+    // post that was never actually modified. Instead, silently save the hash as
+    // the baseline and skip — identical to the drift-only path below.
+    if (existing && existing.contentHash === null) {
+      logger.info({ postId, title: post.title }, 'Establishing content hash baseline for pre-feature record — not a change.');
+      await Notice.updateOne(
+        { portalPostId: postId },
+        { $set: { contentHash: newContentHash, portalUpdatedAt: postUpdatedAt, lastSyncedAt: new Date() } }
+      );
+      continue;
+    }
+
     const isChanged = existing && existing.contentHash !== newContentHash;
 
     if (!isNew && !isChanged) {

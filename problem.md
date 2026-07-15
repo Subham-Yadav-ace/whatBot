@@ -107,3 +107,8 @@ This document summarizes the major technical challenges, bugs, and workflow issu
 - **Problem:** The daily digest was being sent at **2:30 AM IST** instead of 9:00 AM. Deadline reminders were also firing in the early morning hours.
 - **Root Cause:** The AWS EC2 server runs in UTC by default. The daily digest cron `0 9 * * *` means 9:00 AM UTC = **2:30 AM IST**. Similarly, `dayjs().endOf('day')` in the reminder scheduler resolved to midnight UTC = 5:30 AM IST, causing the final reminder to fire at ~3:30 AM IST.
 - **Fix:** Added `TZ=Asia/Kolkata` to the bot service environment block in `docker-compose.yml`. This sets the Node.js process timezone to IST inside the container, making all `dayjs()` calls, cron expressions, and `Date` operations run in Indian Standard Time with no code changes required.
+
+
+existing.contentHash === null  →  baseline guard fires → save hash, skip ✅
+existing.contentHash === newHash  →  drift-only path → update timestamps, skip ✅  
+existing.contentHash !== newHash  →  genuine change → run AI diff + notify ✅
