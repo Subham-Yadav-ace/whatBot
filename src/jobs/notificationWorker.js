@@ -37,7 +37,7 @@ async function startNotificationWorker() {
           logger.info({ noticeId }, 'Already notified for new-drive — skipping duplicate');
           return;
         }
-        await sendToGroup(formatNewDrive(notice));
+        await sendToGroup(formatNewDrive(notice), notice.attachments);
         logger.info({ noticeId, company: notice.summary.company }, 'New-drive notification sent');
         return;
       }
@@ -53,7 +53,7 @@ async function startNotificationWorker() {
           logger.info({ noticeId }, 'Already notified for follow-up-post — skipping duplicate');
           return;
         }
-        await sendToGroup(formatFollowUpPost(notice));
+        await sendToGroup(formatFollowUpPost(notice), notice.attachments);
         logger.info({ noticeId, company: notice.summary.company }, 'Follow-up post notification sent');
         return;
       }
@@ -84,7 +84,7 @@ async function startNotificationWorker() {
           logger.info({ noticeId }, 'Already notified for this update event — skipping duplicate');
           return;
         }
-        await sendToGroup(formatNoticeUpdated(notice, diffLines || []));
+        await sendToGroup(formatNoticeUpdated(notice, diffLines || []), notice.attachments);
         logger.info({ noticeId, company: notice.summary.company }, 'Notice-updated notification sent');
         return;
       }
@@ -100,7 +100,7 @@ async function startNotificationWorker() {
           logger.info({ noticeId }, 'Already notified for admin-announcement — skipping duplicate');
           return;
         }
-        await sendToGroup(formatAdminAnnouncement(notice));
+        await sendToGroup(formatAdminAnnouncement(notice), notice.attachments);
         logger.info({ noticeId, title: notice.title }, 'Admin announcement sent');
       }
     },

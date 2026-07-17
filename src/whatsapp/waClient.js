@@ -1,6 +1,6 @@
 'use strict';
 
-const { Client, LocalAuth } = require('whatsapp-web.js');
+const { Client, LocalAuth, MessageMedia } = require('whatsapp-web.js');
 const qrcode = require('qrcode-terminal');
 const env = require('../config/env');
 const logger = require('../utils/logger').child({ module: 'waClient' });
@@ -92,7 +92,7 @@ async function initWAClient() {
 /**
  * Send a plain-text message to the configured WhatsApp group.
  */
-async function sendToGroup(message) {
+async function sendToGroup(message, attachments = []) {
   if (!isReady || !client) {
     throw new Error('WhatsApp client not ready');
   }
@@ -101,6 +101,18 @@ async function sendToGroup(message) {
   }
   await client.sendMessage(env.whatsappGroupId, message);
   logger.info({ groupId: env.whatsappGroupId }, 'Message sent to group');
+
+  for (const attachment of attachments) {
+    if (attachment.url) {
+      try {
+        const media = await MessageMedia.fromUrl(attachment.url, { unsafeMime: true, filename: attachment.fileName });
+        await client.sendMessage(env.whatsappGroupId, media, { caption: attachment.fileName });
+        logger.info({ fileName: attachment.fileName }, 'Attachment sent');
+      } catch (err) {
+        logger.error({ err: err.message, url: attachment.url }, 'Failed to send attachment');
+      }
+    }
+  }
 }
 
 /**

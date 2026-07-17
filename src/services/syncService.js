@@ -86,7 +86,16 @@ async function runSync() {
     ]);
 
     const newRawBody = detail.body || detail.title || '';
-    const newAttachments = rawAttachments.map((a) => ({ fileName: a.fileName, url: a.url }));
+    const newAttachments = rawAttachments.map((a) => {
+      let url = a.url;
+      if (!url && a.s3Key) {
+        const match = a.s3Key.match(/^s3:\/\/([^\/]+)\/(.+)$/);
+        if (match) {
+          url = `https://${match[1]}.s3.amazonaws.com/${match[2]}`;
+        }
+      }
+      return { fileName: a.originalFileName || a.fileName, url };
+    });
 
     // Compute content hash — the definitive source of truth for change detection.
     // Compares title + body + attachments so that a portal relative-timestamp tick
