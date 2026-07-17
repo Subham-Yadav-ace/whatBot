@@ -49,6 +49,8 @@ The bot performs the following automated tasks end-to-end, every 5 minutes:
 | **Detects Changes** | Uses MD5 content hashing to detect genuine content changes (ignores portal timestamp drift) |
 | **Summarises** | Calls Google Gemini 2.5 Flash to extract structured data: company, role, package, eligibility, deadline, etc. |
 | **Classifies** | Distinguishes new drives, follow-up announcements (shortlists, schedules), and admin-only notices |
+| **Extracts Tables** | Parses HTML tables from notice bodies and converts them into downloadable CSV files |
+| **Sends Attachments** | Automatically downloads portal attachments (and extracted CSVs) and sends them directly to the WhatsApp chat |
 | **Broadcasts** | Sends formatted WhatsApp messages to a student group |
 | **Reminds** | Sends 24-hour and same-day deadline reminders via scheduled BullMQ jobs |
 | **Digests** | Sends a daily 9 AM summary of active drives and upcoming deadlines |
@@ -64,6 +66,7 @@ The bot performs the following automated tasks end-to-end, every 5 minutes:
 | Portal API Client | Axios | JWT-authenticated REST calls to the placement portal |
 | Database | MongoDB + Mongoose | Persistent notice storage with change tracking |
 | Job Queue | BullMQ + Redis | Reliable async job scheduling and delivery |
+| HTML Parsing | Cheerio | Extracting HTML tables from notices into CSV format |
 | AI | Google Gemini 2.5 Flash (`@google/genai`) | Structured placement data extraction |
 | WhatsApp | whatsapp-web.js + Puppeteer + Chromium | Automated WhatsApp messaging via a linked phone |
 | Admin Alerts | Telegram Bot API | Out-of-band error notifications |
@@ -155,6 +158,7 @@ S3 ──► storageState.json ──► session cookie
                                    │
                                    ▼
                       WhatsApp group message
+                      (with Media/Document Attachments)
 ```
 
 ## Project Structure
@@ -858,9 +862,14 @@ An admin Telegram alert is sent. `whatsapp-web.js` will attempt auto-reconnect i
 ### Sending Messages
 
 ```javascript
-async function sendToGroup(message) {
+async function sendToGroup(message, attachments = []) {
   if (!isReady || !client) throw new Error('WhatsApp client not ready');
   await client.sendMessage(env.whatsappGroupId, message);
+  
+  // Iterates and sends MessageMedia for each attachment or CSV
+  for (const attachment of attachments) {
+    // ... media fetching and sending logic
+  }
 }
 ```
 
