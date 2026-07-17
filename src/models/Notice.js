@@ -39,6 +39,8 @@ const noticeSchema = new mongoose.Schema(
       {
         fileName: String,
         url: String,
+        base64Data: String,
+        mimeType: String,
       },
     ],
 

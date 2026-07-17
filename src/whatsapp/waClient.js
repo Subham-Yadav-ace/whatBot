@@ -103,14 +103,18 @@ async function sendToGroup(message, attachments = []) {
   logger.info({ groupId: env.whatsappGroupId }, 'Message sent to group');
 
   for (const attachment of attachments) {
-    if (attachment.url) {
-      try {
+    try {
+      if (attachment.url) {
         const media = await MessageMedia.fromUrl(attachment.url, { unsafeMime: true, filename: attachment.fileName });
         await client.sendMessage(env.whatsappGroupId, media, { caption: attachment.fileName });
         logger.info({ fileName: attachment.fileName }, 'Attachment sent');
-      } catch (err) {
-        logger.error({ err: err.message, url: attachment.url }, 'Failed to send attachment');
+      } else if (attachment.base64Data) {
+        const media = new MessageMedia(attachment.mimeType, attachment.base64Data, attachment.fileName);
+        await client.sendMessage(env.whatsappGroupId, media, { caption: attachment.fileName });
+        logger.info({ fileName: attachment.fileName }, 'Base64 Attachment sent');
       }
+    } catch (err) {
+      logger.error({ err: err.message, url: attachment.url || attachment.fileName }, 'Failed to send attachment');
     }
   }
 }

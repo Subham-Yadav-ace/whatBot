@@ -9,6 +9,7 @@ const { extractSummary } = require('./aiSummaryService');
 const { diffSummary } = require('./diffService');
 const Notice = require('../models/Notice');
 const { notificationQueue, reminderQueue } = require('../jobs/queue');
+const { extractTableToCsvAttachment } = require('../utils/tableExtractor');
 
 /**
  * Schedule 24h and same-day deadline reminders for a notice.
@@ -96,6 +97,11 @@ async function runSync() {
       }
       return { fileName: a.originalFileName || a.fileName, url };
     });
+
+    const tableAttachment = extractTableToCsvAttachment(newRawBody);
+    if (tableAttachment) {
+      newAttachments.push(tableAttachment);
+    }
 
     // Compute content hash — the definitive source of truth for change detection.
     // Compares title + body + attachments so that a portal relative-timestamp tick
