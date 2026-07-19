@@ -68,8 +68,6 @@ const env = {
   whatsappSendDelayMs: parseInt(process.env.WHATSAPP_SEND_DELAY_MS || '1500', 10),
   whatsappGroupId: process.env.WHATSAPP_GROUP_ID || '',
 
-  // Daily Digest
-  dailyDigestCron: process.env.DAILY_DIGEST_CRON || '0 9 * * *',
 
   // App
   nodeEnv: process.env.NODE_ENV || 'development',

@@ -9,7 +9,6 @@ const { initWAClient, destroyClient }   = require('./whatsapp/waClient');
 const { startSyncWorker }               = require('./jobs/syncWorker');
 const { startNotificationWorker }       = require('./jobs/notificationWorker');
 const { startReminderWorker }           = require('./jobs/reminderWorker');
-const { startDigestWorker }             = require('./jobs/digestWorker');
 
 let workers = [];
 
@@ -35,8 +34,7 @@ async function main() {
   const syncWorker    = await startSyncWorker();
   const notifWorker   = await startNotificationWorker();
   const remindWorker  = await startReminderWorker();
-  const digestWorker  = await startDigestWorker();
-  workers = [syncWorker, notifWorker, remindWorker, digestWorker];
+  workers = [syncWorker, notifWorker, remindWorker];
 
   logger.info('🚀 AIT Placement Bot is live! Syncing every ' + env.syncIntervalMs / 1000 + 's');
 

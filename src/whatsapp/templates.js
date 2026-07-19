@@ -1,7 +1,7 @@
 'use strict';
 
 const dayjs = require('dayjs');
-
+const env = require('../config/env');
 function fmt(date) {
   if (!date) return null;
   return dayjs(date).format('DD MMM YYYY');
@@ -39,6 +39,10 @@ function formatNewDrive(notice) {
     lines.push('');
     lines.push(`📎 Attachments: ${notice.attachments.map((a) => a.fileName).join(', ')}`);
   }
+  if (s.hasPlainTextNames) {
+    lines.push('');
+    lines.push(`🔗 View Full List of Names on Portal:\n${env.portalBaseUrl}`);
+  }
   const tag = (s.company || 'Placement').replace(/\s+/g, '');
   lines.push('');
   lines.push(`#Placement #${tag}`);
@@ -64,6 +68,10 @@ function formatNoticeUpdated(notice, diffLines) {
     lines.push('');
     lines.push(`🔗 Apply Link:\n${s.applyLink}`);
   }
+  if (s.hasPlainTextNames) {
+    lines.push('');
+    lines.push(`🔗 View Full List of Names on Portal:\n${env.portalBaseUrl}`);
+  }
 
   return lines.join('\n');
 }
@@ -87,6 +95,10 @@ function formatFollowUpPost(notice) {
   }
   if (notice.attachments?.length) {
     lines.push(`📎 Attachments: ${notice.attachments.map((a) => a.fileName).join(', ')}`);
+    lines.push('');
+  }
+  if (s.hasPlainTextNames) {
+    lines.push(`🔗 View Full List of Names on Portal:\n${env.portalBaseUrl}`);
     lines.push('');
   }
   const tag = (s.company || 'Placement').replace(/\s+/g, '');
@@ -135,38 +147,7 @@ function formatFinalReminder(notice) {
   return lines.join('\n');
 }
 
-/**
- * Morning daily digest.
- */
-function formatDailyDigest(newDrives, upcomingDeadlines) {
-  const lines = [];
 
-  lines.push('📰 DAILY PLACEMENT DIGEST');
-  lines.push(dayjs().format('DD MMM YYYY'));
-  lines.push('');
-
-  if (newDrives.length === 0 && upcomingDeadlines.length === 0) {
-    lines.push('No new drives or upcoming deadlines today.');
-    return lines.join('\n');
-  }
-
-  if (newDrives.length > 0) {
-    lines.push(`New Drives (${newDrives.length}):`);
-    newDrives.forEach((n) => {
-      lines.push(`• ${n.summary.company} — ${n.summary.role}`);
-    });
-  }
-
-  if (upcomingDeadlines.length > 0) {
-    if (newDrives.length > 0) lines.push('');
-    lines.push('Upcoming Deadlines:');
-    upcomingDeadlines.forEach((n) => {
-      lines.push(`• ${n.summary.company} — ${fmt(n.summary.deadline)}`);
-    });
-  }
-
-  return lines.join('\n');
-}
 
 /**
  * Strip HTML tags from a string and produce readable plain text.
@@ -215,5 +196,4 @@ module.exports = {
   formatAdminAnnouncement,
   formatDeadlineReminder,
   formatFinalReminder,
-  formatDailyDigest,
 };

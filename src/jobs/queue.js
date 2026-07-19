@@ -9,8 +9,8 @@ const connection = getRedisConnection();
 const syncQueue         = new Queue('sync',         { connection });
 const notificationQueue = new Queue('notification', { connection });
 const reminderQueue     = new Queue('reminder',     { connection });
-const digestQueue       = new Queue('digest',       { connection });
 
-logger.info('BullMQ queues initialized (sync, notification, reminder, digest)');
 
-module.exports = { syncQueue, notificationQueue, reminderQueue, digestQueue };
+logger.info('BullMQ queues initialized (sync, notification, reminder)');
+
+module.exports = { syncQueue, notificationQueue, reminderQueue };

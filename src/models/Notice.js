@@ -15,6 +15,7 @@ const summaryShape = {
   applyLink: { type: String, default: null },
   importantInstructions: { type: String, default: '' },
   hasShortlist: { type: Boolean, default: false },
+  hasPlainTextNames: { type: Boolean, default: false },
   isInternship: { type: Boolean, default: false },
   isFollowUp: { type: Boolean, default: false },
 };

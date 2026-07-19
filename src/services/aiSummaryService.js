@@ -47,6 +47,10 @@ const SUMMARY_SCHEMA = {
       type: 'boolean',
       description: 'Set to true if the body contains a specific list or table of student names who are shortlisted, eligible, or selected. False otherwise.',
     },
+    hasPlainTextNames: {
+      type: 'boolean',
+      description: 'Set to true if the text contains a list of student names (e.g., shortlisted candidates) that are written in plain text and NOT inside an HTML table.',
+    },
     isInternship: { type: 'boolean' },
     isFollowUp: {
       type: 'boolean',
@@ -65,6 +69,7 @@ const SUMMARY_SCHEMA = {
     'deadline',
     'applyLink',
     'importantInstructions',
+    'hasPlainTextNames',
     'isInternship',
     'isFollowUp',
   ],
@@ -91,6 +96,7 @@ Instructions:
 - For "eligibleBranches": use short branch codes like CSE, IT, ENTC, MECH, CIVIL, etc.
 - For "isInternship": true if the role is an internship or internship+PPO, false otherwise.
 - For "isFollowUp": set to true if this post is a follow-up/update for a company already announced — e.g. shortlist announcement, interview slot timings, PPT/GD/PI schedule, reporting instructions, or any supplementary details. Set to false if this is a brand-new drive announcement.
+- For "hasPlainTextNames": true ONLY if there is a list of student names in the text that is not in a table format.
 - Respond with ONLY the JSON object. No markdown, no explanation, no code fences.`;
 }
 
@@ -190,6 +196,7 @@ function getEmptySummary() {
     deadline: null,
     applyLink: null,
     importantInstructions: '',
+    hasPlainTextNames: false,
     isInternship: false,
     isFollowUp: false,
   };

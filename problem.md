@@ -117,3 +117,6 @@ existing.contentHash !== newHash  →  genuine change → run AI diff + notify �
 
 the msg of update of a company are being sent as a new drive 
 -->to be fixed
+
+the data in the chat -->like tables are made the tables
+and as for the plain text we provied the link
