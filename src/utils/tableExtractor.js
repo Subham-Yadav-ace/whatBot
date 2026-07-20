@@ -100,7 +100,7 @@ function extractTableToCsvAttachment(rawBody) {
   const base64Data = Buffer.from(csvString, 'utf-8').toString('base64');
 
   return {
-    fileName: 'Shortlisted_Candidates.csv',
+    fileName: 'List.csv',
     base64Data,
     mimeType: 'text/csv',
   };
