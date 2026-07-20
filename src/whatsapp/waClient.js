@@ -15,20 +15,20 @@ function buildClient() {
     puppeteer: {
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
+      timeout: 0,   // disable Puppeteer's own navigation timeout — we use our own 5-min timeout
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
-        '--no-zygote',
-        // '--single-process' removed — causes ready event to stall at 99% on headless servers
+        // '--no-zygote' removed — causes renderer subprocess issues without --single-process
         '--disable-gpu',
         '--disable-crash-reporter',
         '--disable-extensions',
-        '--disable-background-timer-throttling',     // prevents JS timer stalls in headless mode
-        '--disable-backgrounding-occluded-windows',  // keeps page active when headless
-        '--disable-renderer-backgrounding',          // prevents renderer from being deprioritised
+        '--disable-background-timer-throttling',
+        '--disable-backgrounding-occluded-windows',
+        '--disable-renderer-backgrounding',
         '--remote-debugging-port=0',
       ],
     },
