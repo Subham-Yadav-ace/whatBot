@@ -39,18 +39,15 @@ ENV PUPPETEER_EXECUTABLE_PATH=/usr/bin/chromium
 ENV XDG_CONFIG_HOME=/tmp
 ENV XDG_CACHE_HOME=/tmp
 
+# Create non-root user BEFORE copying files so no chown -R is needed
+RUN groupadd -r botuser && useradd -r -g botuser -G audio,video botuser \
+    && mkdir -p /app/whatsapp_auth
+
 WORKDIR /app
 
-# Copy production node_modules from deps stage
-COPY --from=deps /app/node_modules ./node_modules
-
-# Copy source code
-COPY . .
-
-# Run as non-root for security
-RUN groupadd -r botuser && useradd -r -g botuser -G audio,video botuser \
-    && mkdir -p /app/whatsapp_auth \
-    && chown -R botuser:botuser /app
+# Copy with correct ownership from the start — avoids slow recursive chown
+COPY --from=deps --chown=botuser:botuser /app/node_modules ./node_modules
+COPY --chown=botuser:botuser . .
 
 USER botuser
 
