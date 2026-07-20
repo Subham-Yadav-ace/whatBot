@@ -41,7 +41,8 @@ ENV XDG_CACHE_HOME=/tmp
 
 # Create non-root user BEFORE copying files so no chown -R is needed
 RUN groupadd -r botuser && useradd -r -g botuser -G audio,video botuser \
-    && mkdir -p /app/whatsapp_auth
+    && mkdir -p /app/whatsapp_auth \
+    && chown botuser:botuser /app /app/whatsapp_auth
 
 WORKDIR /app
 
