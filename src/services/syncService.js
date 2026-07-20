@@ -99,18 +99,19 @@ async function runSync() {
       return { fileName: a.originalFileName || a.fileName, url };
     });
 
-    const tableAttachment = extractTableToCsvAttachment(newRawBody);
-    if (tableAttachment) {
-      newAttachments.push(tableAttachment);
-    }
-
-    // Compute content hash — the definitive source of truth for change detection.
-    // Compares title + body + attachments so that a portal relative-timestamp tick
-    // ("1 day ago" → "2 days ago") is NOT treated as a content change.
+    // Compute content hash BEFORE adding the synthetic CSV attachment.
+    // The CSV is derived entirely from rawBody (already in the hash), so including
+    // it would cause the hash to change whenever the filename changes — triggering
+    // false "content changed" detections on existing notices.
     const newContentHash = crypto
       .createHash('md5')
       .update(post.title + newRawBody + JSON.stringify(newAttachments))
       .digest('hex');
+
+    const tableAttachment = extractTableToCsvAttachment(newRawBody);
+    if (tableAttachment) {
+      newAttachments.push(tableAttachment);
+    }
 
     // Baseline guard: existing record has no contentHash yet (saved before the
     // hash feature was deployed). null !== newHash is truthy, which would

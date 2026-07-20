@@ -38,6 +38,10 @@ function buildClient() {
 
   c.on('authenticated', () => logger.info('WhatsApp authenticated'));
 
+  c.on('loading_screen', (percent, message) => {
+    logger.info({ percent, message }, 'WhatsApp loading...');
+  });
+
   c.on('ready', () => {
     isReady = true;
     logger.info('WhatsApp client ready ✅');
@@ -67,10 +71,14 @@ async function initWAClient() {
 
   client = buildClient();
 
+  // 5-minute timeout — EC2 instances can be slow on cold start after a restart.
+  // 'authenticated' fires quickly but 'ready' waits for WhatsApp Web to fully load.
+  const INIT_TIMEOUT_MS = 5 * 60 * 1000;
+
   await new Promise((resolve, reject) => {
     const timeout = setTimeout(
-      () => reject(new Error('WhatsApp init timed out after 120s — scan the QR code')),
-      120_000
+      () => reject(new Error(`WhatsApp init timed out after ${INIT_TIMEOUT_MS / 1000}s — Chromium may be too slow to load`)),
+      INIT_TIMEOUT_MS
     );
 
     client.once('ready', () => {
