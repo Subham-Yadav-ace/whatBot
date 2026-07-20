@@ -12,17 +12,24 @@ let isReady = false;
 function buildClient() {
   const c = new Client({
     authStrategy: new LocalAuth({ dataPath: env.whatsappAuthFolder }),
+    // Pin to a known stable WhatsApp Web version.
+    // Without this, WhatsApp serves whatever version is live — if it's newer than
+    // what whatsapp-web.js supports, the hook injection never completes and
+    // the 'ready' event hangs forever at 99-100% loading screen.
+    webVersionCache: {
+      type: 'remote',
+      remotePath: 'https://raw.githubusercontent.com/wppconnect-team/wa-version/main/html/2.3000.1015920587-alpha.html',
+    },
     puppeteer: {
       headless: true,
       executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium',
-      timeout: 0,   // disable Puppeteer's own navigation timeout — we use our own 5-min timeout
+      timeout: 0,
       args: [
         '--no-sandbox',
         '--disable-setuid-sandbox',
         '--disable-dev-shm-usage',
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
-        // '--no-zygote' removed — causes renderer subprocess issues without --single-process
         '--disable-gpu',
         '--disable-crash-reporter',
         '--disable-extensions',
