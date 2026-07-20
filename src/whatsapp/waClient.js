@@ -22,11 +22,14 @@ function buildClient() {
         '--disable-accelerated-2d-canvas',
         '--no-first-run',
         '--no-zygote',
-        '--single-process',
+        // '--single-process' removed — causes ready event to stall at 99% on headless servers
         '--disable-gpu',
         '--disable-crash-reporter',
         '--disable-extensions',
-        '--remote-debugging-port=0',   // prevents singleton port conflict on restart
+        '--disable-background-timer-throttling',     // prevents JS timer stalls in headless mode
+        '--disable-backgrounding-occluded-windows',  // keeps page active when headless
+        '--disable-renderer-backgrounding',          // prevents renderer from being deprioritised
+        '--remote-debugging-port=0',
       ],
     },
   });
