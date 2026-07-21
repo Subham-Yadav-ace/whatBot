@@ -120,3 +120,10 @@ the msg of update of a company are being sent as a new drive
 
 the data in the chat -->like tables are made the tables
 and as for the plain text we provied the link
+
+
+The 99% Startup Hang: WhatsApp Web updated its internal codebase, breaking whatsapp-web.js's ability to detect when it finished loading. We pinned Chromium to load a known stable version of WhatsApp Web to fix this.
+The RAM Exhaustion: Chromium needs ~800MB RAM to run its multi-process architecture. Your EC2 only had ~700MB free and zero swap space, causing silent crashes. Adding a 2GB swap file fixed this permanently.
+The Docker Build Speed: We reorganised the Dockerfile to create the botuser before copying files, bypassing a slow 4-minute chown -R command over the node modules.
+The MD5 Hash False Triggers: We fixed the issue where changing the name of our synthetic CSV file triggered fake "Notice Updated" notifications.
+The CSV Names: CSV attachments are now cleanly named List.csv to keep the chat interface tid

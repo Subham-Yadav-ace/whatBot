@@ -100,12 +100,22 @@ async function runSync() {
     });
 
     // Compute content hash BEFORE adding the synthetic CSV attachment.
-    // The CSV is derived entirely from rawBody (already in the hash), so including
-    // it would cause the hash to change whenever the filename changes — triggering
-    // false "content changed" detections on existing notices.
+    // Strip query parameters from attachment URLs (like AWS expiring tokens)
+    // so they don't trigger false "content changed" detections on every fetch.
+    const hashableAttachments = newAttachments.map((a) => {
+      let cleanUrl = a.url;
+      if (cleanUrl) {
+        try {
+          const parsed = new URL(cleanUrl);
+          cleanUrl = parsed.origin + parsed.pathname;
+        } catch (e) {} // ignore invalid URLs
+      }
+      return { fileName: a.fileName, url: cleanUrl };
+    });
+
     const newContentHash = crypto
       .createHash('md5')
-      .update(post.title + newRawBody + JSON.stringify(newAttachments))
+      .update(post.title + newRawBody + JSON.stringify(hashableAttachments))
       .digest('hex');
 
     const tableAttachment = extractTableToCsvAttachment(newRawBody);
